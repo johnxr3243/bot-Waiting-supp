@@ -57,9 +57,16 @@ const audioSets = [
     }
 ];
 
-// دالة لاختيار مجموعة عشوائية
-function getRandomAudioSet() {
-    return audioSets[Math.floor(Math.random() * audioSets.length)];
+// حالة تبديل المجموعات لكل سيرفر (alternating)
+const guildAudioIndex = new Map();
+
+// دالة لاختيار مجموعة بالتناوب لكل سيرفر
+function getNextAudioSet(guildId) {
+    if (!guildAudioIndex.has(guildId)) guildAudioIndex.set(guildId, 0);
+    const index = guildAudioIndex.get(guildId) % audioSets.length;
+    const selected = audioSets[index];
+    guildAudioIndex.set(guildId, (index + 1) % audioSets.length);
+    return selected;
 }
 
 // دالة لإنشاء اتصال صوتي
@@ -497,19 +504,23 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             
             // 2. إرسال إشعار طلب جديد
             await sendNewCallNotification(member.id, member.user.tag);
-            
-            // 3. الانتظار 4 ثواني فقط ثم تشغيل التسجيلات
+
+            // 3. اختيار مجموعة صوت بالتناوب لكل سيرفر
+            const selectedAudioSet = getNextAudioSet(voiceChannel.guild.id);
+            console.log(`🎵 تم اختيار ${selectedAudioSet.name} للعميل ${member.user.tag}`);
+
+            // 4. الانتظار 4 ثواني فقط ثم تشغيل التسجيلات
             setTimeout(async () => {
                 if (!member.voice.channelId || member.voice.channelId !== config.supportVoiceId) {
                     console.log(`❌ العميل ${member.user.tag} خرج قبل بدء الصوت`);
                     return;
                 }
-                
-                // تشغيل صوت الانتظار
-                console.log(`🔊 تشغيل صوت الانتظار للعميل ${member.id}`);
-                const waitingPlayer = playAudio(connection, 'waiting_call.mp3', member.id, false);
-                
-                // حفظ بيانات العميل
+
+                // تشغيل صوت الانتظار من المجموعة المختارة
+                console.log(`🔊 تشغيل ${selectedAudioSet.waiting} للعميل ${member.id}`);
+                const waitingPlayer = playAudio(connection, selectedAudioSet.waiting, member.id, false, selectedAudioSet);
+
+                // حفظ بيانات العميل مع المجموعة الصوتية
                 const callData = {
                     connection,
                     waitingPlayer,
@@ -519,26 +530,27 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                     isBotMuted: false,
                     hasAdmin: false,
                     userName: member.user.tag,
-                    joinedAt: Date.now()
+                    joinedAt: Date.now(),
+                    audioSet: selectedAudioSet // حفظ المجموعة الصوتية المستخدمة
                 };
-                
-                // استمع لانتهاء صوت الانتظار ثم ابدأ الموسيقى
+
+                // استمع لانتهاء صوت الانتظار ثم ابدأ الموسيقى الخلفية من نفس المجموعة
                 if (waitingPlayer) {
                     waitingPlayer.once(AudioPlayerStatus.Idle, () => {
                         if (member.voice.channelId === config.supportVoiceId) {
                             const currentAdmin = getAdminInVoice(voiceChannel);
                             if (!currentAdmin) {
-                                console.log(`🎵 بدء موسيقى الانتظار للعميل ${member.id}`);
-                                const musicPlayer = playAudio(connection, 'background_music.mp3', member.id, true);
+                                console.log(`🎵 بدء موسيقى ${selectedAudioSet.background} للعميل ${member.id}`);
+                                const musicPlayer = playAudio(connection, selectedAudioSet.background, member.id, true, selectedAudioSet);
                                 callData.musicPlayer = musicPlayer;
                                 callData.waitingPlayer = null;
                             }
                         }
                     });
                 }
-                
+
                 activeCalls.set(member.id, callData);
-                
+
             }, 4000); // 4 ثواني فقط
             
         }
