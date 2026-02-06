@@ -139,7 +139,7 @@ async function createPrivateVoiceRoom(guild, userId, clientName, adminId, adminN
         const roomNumber = Math.floor(Math.random() * 1000);
         
         const voiceChannel = await guild.channels.create({
-            name: `🔊-مكالمه-${cleanClientName}-${roomNumber}`,
+            name: `Supp-${cleanClientName}-${roomNumber}`,
             type: ChannelType.GuildVoice,
             parent: category ? category.id : null,
             permissionOverwrites: [
@@ -623,7 +623,7 @@ client.on('ready', async () => {
     // تعيين حالة البوت
     client.user.setPresence({
         activities: [{
-            name: '📞 | نظام الدعم',
+            name: 'System Support Ai',
             type: 2
         }],
         status: 'online'
