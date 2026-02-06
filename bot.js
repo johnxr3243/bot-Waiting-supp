@@ -43,6 +43,25 @@ const activeCalls = new Map();
 const voiceConnections = new Map();
 const privateRooms = new Map();
 
+// تعريف مجموعات الصوت
+const audioSets = [
+    {
+        name: 'الطقم الأول',
+        waiting: 'waiting_call.mp3',
+        background: 'background_music.mp3'
+    },
+    {
+        name: 'الطقم الثاني',
+        waiting: 'waiting2_call.mp3',
+        background: 'background2_music.mp3'
+    }
+];
+
+// دالة لاختيار مجموعة عشوائية
+function getRandomAudioSet() {
+    return audioSets[Math.floor(Math.random() * audioSets.length)];
+}
+
 // دالة لإنشاء اتصال صوتي
 async function getOrCreateConnection(channel) {
     try {
@@ -78,7 +97,7 @@ async function getOrCreateConnection(channel) {
 }
 
 // دالة تشغيل الصوت
-function playAudio(connection, fileName, userId, shouldLoop = false) {
+function playAudio(connection, fileName, userId, shouldLoop = false, audioSet = null) {
     try {
         const soundPath = path.join(__dirname, fileName);
         if (!fs.existsSync(soundPath)) {
@@ -101,13 +120,16 @@ function playAudio(connection, fileName, userId, shouldLoop = false) {
         player.play(resource);
         try { connection.subscribe(player); } catch (err) { console.warn('⚠️ فشل الاشتراك بالمشغل:', err.message); }
 
-        if (shouldLoop && fileName === 'background_music.mp3') {
+        if (shouldLoop) {
             player.on(AudioPlayerStatus.Idle, () => {
                 if (activeCalls.has(userId)) {
                     const callData = activeCalls.get(userId);
-                    if (!callData.isBotMuted) {
-                        console.log(`🔄 تكرار الموسيقى للعميل ${userId}`);
-                        playAudio(connection, 'background_music.mp3', userId, true);
+                    if (!callData.isBotMuted && callData.audioSet) {
+                        console.log(`🔄 تكرار موسيقى ${callData.audioSet.name} للعميل ${userId}`);
+                        playAudio(connection, callData.audioSet.background, userId, true, callData.audioSet);
+                    } else if (!callData || !callData.audioSet) {
+                        // محاولة إعادة تشغيل نفس الملف كنسخة احتياطية
+                        playAudio(connection, fileName, userId, true, audioSet);
                     }
                 }
             });
