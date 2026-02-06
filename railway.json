@@ -5,13 +5,11 @@
     "buildCommand": "npm install",
     "nixpacks": {
       "providers": [
-        "nodejs",
-        "python"
+        "nodejs"
       ],
       "apt": [
         "build-essential",
-        "python3",
-        "libsodium-dev"
+        "python3"
       ]
     }
   },
