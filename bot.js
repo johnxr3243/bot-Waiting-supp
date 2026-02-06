@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { Client, GatewayIntentBits, EmbedBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlayerStatus, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
 const fs = require('fs');
@@ -9,12 +10,27 @@ try {
     const encoder = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
     console.log('✅ مكتبة الصوت جاهزة باستخدام opusscript');
 } catch (error) {
-    console.warn('⚠️  تحذير في مكتبة الصوت:', error.message);
+    console.warn('⚠️ تحذير في مكتبة الصوت:', error.message);
 }
 
+// التحقق من المتغيرات البيئية
+const requiredEnvVars = [
+    'DISCORD_TOKEN',
+    'SUPPORT_CATEGORY_ID',
+    'SUPPORT_VOICE_ID',
+    'SUPPORT_TEXT_ID',
+    'ADMIN_ROLE_ID'
+];
+
+for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+        console.error(`❌ خطأ: المتغير البيئي ${envVar} غير موجود!`);
+        console.error('تأكد من إضافة جميع المتغيرات في ملف .env أو Railway');
+        process.exit(1);
+    }
+}
 
 // الإعدادات
-
 const config = {
     token: process.env.DISCORD_TOKEN,
     supportCategoryId: process.env.SUPPORT_CATEGORY_ID,

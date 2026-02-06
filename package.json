@@ -1,20 +1,35 @@
 {
   "name": "discord-support-bot",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "نظام دعم صوتي متقدم لخادم Discord",
   "main": "bot.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node bot.js",
+    "dev": "node --watch bot.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "discord",
+    "bot",
+    "support",
+    "voice",
+    "audio"
+  ],
+  "author": "Support Bot Team",
   "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "@discordjs/voice": "^0.19.0",
-    "@snazzah/davey": "^0.1.9",
-    "discord.js": "^14.25.1",
+    "@discordjs/voice": "^0.20.1",
+    "discord.js": "^14.15.0",
     "ffmpeg-static": "^5.3.0",
-    "libsodium-wrappers": "^0.8.2",
-    "opusscript": "^0.0.8"
+    "libsodium-wrappers": "^0.9.0",
+    "opusscript": "^0.0.8",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0"
   }
 }
