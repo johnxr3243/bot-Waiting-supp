@@ -1,15 +1,20 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ChannelType, PermissionsBitField } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlayerStatus, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, NoSubscriberBehavior, AudioPlayerStatus, entersState, VoiceConnectionStatus, StreamType } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 
-// إعداد مكتبة الصوت
+// إعداد مكتبة الصوت - حاول استخدام @discordjs/opus أولاً ثم opusscript كاحتياط
 try {
-    const OpusScript = require('opusscript');
-    const encoder = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
-    console.log('✅ مكتبة الصوت جاهزة باستخدام opusscript');
-} catch (error) {
-    console.warn('⚠️  تحذير في مكتبة الصوت:', error.message);
+    require('@discordjs/opus');
+    console.log('✅ مكتبة الصوت جاهزة باستخدام @discordjs/opus');
+} catch (e1) {
+    try {
+        const OpusScript = require('opusscript');
+        const encoder = new OpusScript(48000, 2, OpusScript.Application.AUDIO);
+        console.log('✅ مكتبة الصوت جاهزة باستخدام opusscript');
+    } catch (e2) {
+        console.warn('⚠️  لا توجد مكتبة opus متاحة:', e1.message, '/', e2.message);
+    }
 }
 
 
@@ -45,11 +50,15 @@ async function getOrCreateConnection(channel) {
         
         if (voiceConnections.has(guildId)) {
             const conn = voiceConnections.get(guildId);
-            if (conn.state.status !== VoiceConnectionStatus.Destroyed) {
-                return conn;
+            try {
+                if (conn && conn.state && conn.state.status !== VoiceConnectionStatus.Destroyed) {
+                    return conn;
+                }
+            } catch (err) {
+                // استمر لإنشاء اتصال جديد إذا كانت حالة الاتصال غير قابلة للقراءة
             }
         }
-        
+
         console.log(`🔊 إنشاء اتصال صوتي جديد في ${channel.name}`);
         const connection = joinVoiceChannel({
             channelId: channel.id,
@@ -58,7 +67,7 @@ async function getOrCreateConnection(channel) {
             selfDeaf: false,
             selfMute: false
         });
-        
+
         voiceConnections.set(guildId, connection);
         return connection;
         
@@ -76,20 +85,22 @@ function playAudio(connection, fileName, userId, shouldLoop = false) {
             console.log(`❌ ملف ${fileName} مش موجود`);
             return null;
         }
-        
-        const resource = createAudioResource(soundPath, {
+
+        const input = fs.createReadStream(soundPath);
+        const resource = createAudioResource(input, {
+            inputType: StreamType.Arbitrary,
             inlineVolume: true
         });
-        
+
         const player = createAudioPlayer({
             behaviors: {
                 noSubscriber: NoSubscriberBehavior.Pause
             }
         });
-        
+
         player.play(resource);
-        connection.subscribe(player);
-        
+        try { connection.subscribe(player); } catch (err) { console.warn('⚠️ فشل الاشتراك بالمشغل:', err.message); }
+
         if (shouldLoop && fileName === 'background_music.mp3') {
             player.on(AudioPlayerStatus.Idle, () => {
                 if (activeCalls.has(userId)) {
@@ -101,9 +112,9 @@ function playAudio(connection, fileName, userId, shouldLoop = false) {
                 }
             });
         }
-        
+
         return player;
-        
+
     } catch (error) {
         console.error(`❌ خطأ في تشغيل ${fileName}:`, error);
         return null;
@@ -459,7 +470,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 return;
             }
             
-            await entersState(connection, VoiceConnectionStatus.Ready, 3000);
+            // زيادة المهلة لتفادي اخطاء الشبكة الصغيرة
+            await entersState(connection, VoiceConnectionStatus.Ready, 10000);
             
             // 2. إرسال إشعار طلب جديد
             await sendNewCallNotification(member.id, member.user.tag);
@@ -631,7 +643,11 @@ client.on('ready', async () => {
 });
 
 // تسجيل الدخول
-client.login(config.token);
+if (!config.token) {
+    console.error('❌ المتغير البيئي DISCORD_TOKEN غير معبأ. أضف التوكن ثم أعد التشغيل.');
+    process.exit(1);
+}
+client.login(config.token).catch(err => console.error('❌ فشل تسجيل الدخول:', err));
 
 // معالجة الأخطاء
 process.on('unhandledRejection', error => {
@@ -640,4 +656,14 @@ process.on('unhandledRejection', error => {
 
 process.on('uncaughtException', error => {
     console.error('❌ استثناء غير معالج:', error);
+});
+
+// تنظيف الاتصالات عند إيقاف العملية
+process.on('SIGINT', async () => {
+    console.log('🛑 إغلاق - تنظيف الاتصالات الصوتية');
+    for (const [guildId, conn] of voiceConnections.entries()) {
+        try { conn.destroy(); } catch (e) {}
+        voiceConnections.delete(guildId);
+    }
+    process.exit(0);
 });
